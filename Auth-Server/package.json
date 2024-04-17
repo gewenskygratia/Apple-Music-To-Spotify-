@@ -1,0 +1,20 @@
+{
+  "name": "auth-server",
+  "version": "1.0.0",
+  "description": "Authentication Server",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Gewensky Gratia",
+  "license": "ISC",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.19.2",
+    "jsonwebtoken": "^9.0.2",
+    "querystring": "^0.2.1",
+    "request": "^2.88.2",
+    "requests": "^0.3.0",
+    "url-search-params-polyfill": "^8.2.5"
+  }
+}
