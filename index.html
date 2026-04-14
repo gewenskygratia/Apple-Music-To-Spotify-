@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Playlist Transfer app</title>
+    <script src="https://js-cdn.music.apple.com/musickit/v1/musickit.js"></script>
+
+    <style>
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial;
+        margin: 0;
+        background: #0f172a;
+        color: white;
+      }
+
+      .container {
+        max-width: 900px;
+        margin: 0 auto;
+        padding: 40px 20px;
+      }
+
+      h1 {
+        text-align: center;
+        margin-bottom: 30px;
+      }
+
+      .card {
+        background: #1e293b;
+        padding: 20px;
+        border-radius: 12px;
+        margin-bottom: 20px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      }
+
+      button {
+        background: #3b82f6;
+        border: none;
+        padding: 10px 14px;
+        border-radius: 8px;
+        color: white;
+        cursor: pointer;
+        margin: 5px 5px 5px 0;
+        transition: 0.2s;
+      }
+
+      button:hover {
+        background: #2563eb;
+      }
+
+      .secondary {
+        background: #475569;
+      }
+
+      .secondary:hover {
+        background: #334155;
+      }
+
+      .danger {
+        background: #ef4444;
+      }
+
+      .danger:hover {
+        background: #dc2626;
+      }
+
+      #playlist-container div {
+        background: #0f172a;
+        padding: 10px;
+        border-radius: 8px;
+        margin-bottom: 10px;
+      }
+
+      input[type="checkbox"] {
+        margin-right: 10px;
+      }
+
+      #transfer-status {
+        margin-top: 10px;
+        padding: 10px;
+        background: #0f172a;
+        border-radius: 8px;
+      }
+
+      h2 {
+        margin-top: 0;
+      }
+
+      .row {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="container">
+      <h1>🎵 Playlist Transfer App</h1>
+
+      <!-- Apple Music -->
+      <div class="card">
+        <h2>Apple Music</h2>
+
+        <button id="apple-login">Login To Apple Music</button>
+        <div class="row">
+          <button id="select-all" class="secondary">Select All</button>
+          <button id="deselect-all" class="secondary">Deselect All</button>
+        </div>
+
+        <h3>Your Playlists</h3>
+        <div id="playlist-container">Please log in to view your playlists.</div>
+      </div>
+
+      <!-- Spotify -->
+      <div class="card">
+        <h2>Spotify</h2>
+        <button id="spotify-login">Login to Spotify</button>
+      </div>
+
+      <!-- Transfer -->
+      <div class="card">
+        <h2>Transfer</h2>
+        <button id="transfer-playlists" class="danger">
+          Transfer Selected Playlists
+        </button>
+
+        <div id="transfer-status"></div>
+      </div>
+    </div>
+
+    <script>
+      //------------APPLE MUSIC------------
+
+      //Fetch developer token from backend
+
+      document.getElementById("select-all").onclick = () => {
+        document
+          .querySelectorAll(".playlist-checkbox")
+          .forEach((cb) => (cb.checked = true));
+      };
+
+      document.getElementById("deselect-all").onclick = () => {
+        document
+          .querySelectorAll(".playlist-checkbox")
+          .forEach((cb) => (cb.checked = false));
+      };
+      async function getDeveloperToken() {
+        const res = await fetch("http://127.0.0.1:3000/login/apple");
+        const data = await res.json();
+        return data.developer_token;
+      }
+
+      async function fetchUserPlaylists(userToken) {
+        const res = await fetch("http://127.0.0.1:3000/apple/playlists", {
+          method: "GET",
+          headers: {
+            "music-user-token": userToken,
+          },
+        });
+
+        const data = await res.json();
+        console.log("Apple Music Playlists:", data);
+
+        const container = document.getElementById("playlist-container");
+        container.innerHTML = "";
+
+        if (data && data.data && data.data.length > 0) {
+          data.data.forEach((playlist) => {
+            const div = document.createElement("div");
+
+            div.innerHTML = `
+    <label>
+      <input 
+        type="checkbox" 
+        class="playlist-checkbox" 
+        value="${playlist.id}"
+      />
+      <strong>${playlist.attributes.name}</strong>
+    </label>
+    <br />
+    Tracks: ${playlist.attributes.trackCount || "N/A"}
+    <br /><br />
+  `;
+
+            container.appendChild(div);
+          });
+        } else {
+          container.innerHTML = "No playlists found";
+        }
+      }
+
+      async function authorizeAppleMusic() {
+        const developerToken = await getDeveloperToken();
+
+        MusicKit.configure({
+          developerToken: developerToken,
+          app: {
+            name: "PlaylistTransfer",
+            build: "1.0",
+          },
+        });
+        const music = MusicKit.getInstance();
+
+        try {
+          const userToken = await music.authorize();
+          console.log("Apple Music Token:", userToken);
+          alert("Logged in succesfully. Playlist fetched.");
+          await fetchUserPlaylists(userToken);
+        } catch (err) {
+          console.error("Failed to authorize user:", err);
+          alert("Apple Music login failed.");
+        }
+      }
+      document
+        .getElementById("apple-login")
+        .addEventListener("click", authorizeAppleMusic);
+
+      //------------SPOTIFY------------
+      async function loginToSpotify() {
+        //Open Spotify login
+        const popup = window.open(
+          "http://127.0.0.1:3000/login/spotify",
+          "Spotify Login",
+          "width=500, height=600",
+        );
+
+        //event listner for popup
+        window.addEventListener("message", (event) => {
+          if (event.origin !== "http://127.0.0.1:3000") return; // security check
+
+          if (event.data.type == "spotify-token") {
+            localStorage.setItem("spotify-access-token", event.data.token);
+            alert("Spotify Login successful");
+          }
+        });
+      }
+
+      document
+        .getElementById("spotify-login")
+        .addEventListener("click", loginToSpotify);
+
+      //------------TRANSFERRING------------
+      async function transferPlaylist() {
+        const spotifyToken = localStorage.getItem("spotify-access-token");
+
+        if (!spotifyToken) {
+          alert("Please log in to Spotify first.");
+          return;
+        }
+        const selectedPlaylists = Array.from(
+          document.querySelectorAll(".playlist-checkbox:checked"),
+        ).map((cb) => cb.value);
+
+        if (selectedPlaylists.length === 0) {
+          alert("Please select at least one playlist.");
+          return;
+        }
+
+        // Send Apple playlists to backend for transfer
+        const transferRes = await fetch("http://127.0.0.1:3000/transfer", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${spotifyToken}`,
+            "music-user-token": MusicKit.getInstance().musicUserToken,
+          },
+        });
+        const result = await transferRes.json();
+
+        const container = document.getElementById("transfer-status");
+
+        container.innerHTML = `
+        <h3>Transfer Summary</h3>
+        <p>✅ Successffuly transfered: ${result.success}</p>
+        <p>❌ Failed playlists: ${result.errors.length > 0 ? result.errors.join(", ") : "None"}</p>
+        `;
+
+        //Show failed tracks per playlist
+        result.details.forEach((p1) => {
+          if (p1.failedTracks.length > 0) {
+            const div = document.createElement("div");
+            div.innerHTML = `
+            <h4>${p1.playlist}</h4>
+            <ul>
+              ${p1.failedTracks.map((track) => `<li>${track.song} — ${track.artist}</li>`).join("")}
+              </ul>
+            `;
+            container.appendChild(div);
+          }
+        });
+      }
+
+      document
+        .getElementById("transfer-playlists")
+        .addEventListener("click", transferPlaylist);
+    </script>
+  </body>
+</html>
